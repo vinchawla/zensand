@@ -1,0 +1,9 @@
+{
+  "name": "ZenSand Garden",
+  "short_name": "ZenSand",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1c1917",
+  "theme_color": "#1c1917",
+  "orientation": "portrait"
+}
