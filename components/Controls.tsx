@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ToolType, SoundState, GenericItemData } from '../types';
-import { Eraser, Circle, Trash2, Wind, CloudRain, Music, Radio, Palette, Settings, TreePine, Flower2, Waves, Landmark, AlignCenterVertical, MousePointer2, RotateCw, Download, ChevronUp, ChevronDown, Hammer, Sliders } from 'lucide-react';
+import { Eraser, Circle, Trash2, Wind, CloudRain, Music, Radio, Palette, Settings, TreePine, Flower2, Waves, Landmark, AlignCenterVertical, MousePointer2, RotateCw, Download, ChevronUp, ChevronDown, Hammer, Sliders, GripHorizontal } from 'lucide-react';
 import { audioEngine } from '../services/audioService';
 
 interface ControlsProps {
@@ -46,39 +46,106 @@ const BridgeIcon = ({ size = 20 }: { size?: number }) => (
      </svg>
 );
 
-const CollapsiblePanel = ({ 
+interface Position {
+    x: number;
+    y: number;
+}
+
+const DraggablePanel = ({ 
     title, 
     icon, 
     isOpen, 
     setIsOpen, 
+    position,
+    onMove,
     children 
 }: { 
     title: string;
     icon: React.ReactNode;
     isOpen: boolean;
     setIsOpen: (v: boolean) => void;
+    position: Position;
+    onMove: (p: Position) => void;
     children?: React.ReactNode;
-}) => (
-    <div className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-stone-700 shadow-xl w-56 shrink-0 transition-all duration-300 overflow-hidden pointer-events-auto">
-        <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className={`w-full p-3 flex items-center justify-between text-stone-300 hover:bg-stone-800/50 transition-colors ${isOpen ? 'border-b border-stone-700/50' : ''}`}
-        >
-            <div className="flex items-center gap-2">
-                {icon}
-                <span className="font-semibold uppercase tracking-widest text-[10px]">{title}</span>
-            </div>
-            {isOpen ? <ChevronUp size={14} className="text-stone-500" /> : <ChevronDown size={14} className="text-stone-500" />}
-        </button>
+}) => {
+    const isDragging = useRef(false);
+    const dragOffset = useRef({ x: 0, y: 0 });
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const rect = (e.currentTarget as HTMLElement).closest('.draggable-panel')?.getBoundingClientRect();
+        if (rect) {
+            isDragging.current = true;
+            dragOffset.current = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        }
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (isDragging.current) {
+            e.stopPropagation();
+            e.preventDefault();
+            onMove({
+                x: e.clientX - dragOffset.current.x,
+                y: e.clientY - dragOffset.current.y
+            });
+        }
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (isDragging.current) {
+            isDragging.current = false;
+            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        }
+    };
+
+    return (
         <div 
-            className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+            className="draggable-panel absolute bg-stone-900/80 backdrop-blur-md rounded-xl border border-stone-700 shadow-xl w-56 transition-shadow duration-300 overflow-hidden pointer-events-auto"
+            style={{ 
+                left: position.x, 
+                top: position.y,
+                cursor: isDragging.current ? 'grabbing' : 'default'
+            }}
         >
-            <div className="p-2 pt-2">
-                {children}
+            <div className="flex items-stretch border-b border-stone-700/50">
+                {/* Drag Handle Area */}
+                <div 
+                    className="flex-1 p-3 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-stone-800/50 transition-colors select-none"
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                >
+                    <GripHorizontal size={14} className="text-stone-600" />
+                    <div className="flex items-center gap-2 text-stone-300">
+                        {icon}
+                        <span className="font-semibold uppercase tracking-widest text-[10px]">{title}</span>
+                    </div>
+                </div>
+
+                {/* Collapse Toggle Button */}
+                <button 
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="px-3 flex items-center justify-center text-stone-500 hover:text-stone-300 hover:bg-stone-800/50 border-l border-stone-700/50 transition-colors"
+                >
+                    {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+            </div>
+
+            <div 
+                className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+            >
+                <div className="p-2 pt-2">
+                    {children}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 const Controls: React.FC<ControlsProps> = ({ 
     currentTool, 
@@ -101,6 +168,11 @@ const Controls: React.FC<ControlsProps> = ({
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [audioOpen, setAudioOpen] = useState(true);
 
+  // Default positions
+  const [toolsPos, setToolsPos] = useState<Position>({ x: 20, y: 80 });
+  const [settingsPos, setSettingsPos] = useState<Position>({ x: 20, y: 360 });
+  const [audioPos, setAudioPos] = useState<Position>({ x: 20, y: 580 });
+
   const handleVolumeChange = (channel: keyof SoundState, val: number) => {
     if (!isAudioInitialized) initAudio();
     audioEngine.resume();
@@ -122,10 +194,10 @@ const Controls: React.FC<ControlsProps> = ({
   ];
 
   return (
-    <div className="absolute top-0 left-0 h-full p-4 pointer-events-none flex flex-col justify-between z-10 max-h-screen overflow-hidden">
+    <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-10">
       
       {/* Title */}
-      <div className="pointer-events-auto bg-stone-900/60 backdrop-blur-md p-3 rounded-xl border border-stone-800 inline-block mb-2 shrink-0 flex justify-between items-center gap-4">
+      <div className="absolute top-4 left-4 pointer-events-auto bg-stone-900/60 backdrop-blur-md p-3 rounded-xl border border-stone-800 flex justify-between items-center gap-4 z-20">
         <h1 className="text-2xl text-stone-200 font-serif drop-shadow-md tracking-wider mb-0" style={{ fontFamily: 'Cinzel Decorative' }}>ZenSand</h1>
         <button 
           onClick={onDownload} 
@@ -136,150 +208,151 @@ const Controls: React.FC<ControlsProps> = ({
         </button>
       </div>
 
-      {/* Main Controls Stack */}
-      <div className="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-hide min-h-0 pb-4">
-        
-        {/* Tools Panel */}
-        <CollapsiblePanel 
-            title="Tools" 
-            icon={<Hammer size={14} />} 
-            isOpen={toolsOpen} 
-            setIsOpen={setToolsOpen}
-        >
-            <div className="grid grid-cols-2 gap-1">
-                {tools.map((t) => (
-                    <button
-                        key={t.id}
-                        onClick={() => setTool(t.id as ToolType)}
-                        className={`p-2 rounded-lg transition-all duration-200 flex flex-col items-center justify-center gap-1 group relative
-                            ${currentTool === t.id 
-                                ? 'bg-amber-700 text-white shadow-md' 
-                                : 'bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-200'}`}
-                        title={t.label}
-                    >
-                        {t.icon}
-                        <span className="text-[9px] font-medium leading-none">{t.label}</span>
-                    </button>
-                ))}
+      {/* Tools Panel */}
+      <DraggablePanel 
+          title="Tools" 
+          icon={<Hammer size={14} />} 
+          isOpen={toolsOpen} 
+          setIsOpen={setToolsOpen}
+          position={toolsPos}
+          onMove={setToolsPos}
+      >
+          <div className="grid grid-cols-2 gap-1">
+              {tools.map((t) => (
+                  <button
+                      key={t.id}
+                      onClick={() => setTool(t.id as ToolType)}
+                      className={`p-2 rounded-lg transition-all duration-200 flex flex-col items-center justify-center gap-1 group relative
+                          ${currentTool === t.id 
+                              ? 'bg-amber-700 text-white shadow-md' 
+                              : 'bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-200'}`}
+                      title={t.label}
+                  >
+                      {t.icon}
+                      <span className="text-[9px] font-medium leading-none">{t.label}</span>
+                  </button>
+              ))}
+          </div>
+      </DraggablePanel>
+
+      {/* Settings Panel */}
+      <DraggablePanel 
+          title="Properties" 
+          icon={<Sliders size={14} />} 
+          isOpen={settingsOpen} 
+          setIsOpen={setSettingsOpen}
+          position={settingsPos}
+          onMove={setSettingsPos}
+      >
+            {/* Color Row */}
+            <div className="flex items-center justify-between mb-2 p-1">
+            <div className="text-stone-400 text-xs flex items-center gap-1">
+                <Palette size={14} /> Color
             </div>
-        </CollapsiblePanel>
+            <div className="relative w-6 h-6 rounded-full overflow-hidden border border-stone-600 hover:border-amber-500 transition-colors">
+                <input 
+                    type="color" 
+                    value={sandColor}
+                    onChange={(e) => setSandColor(e.target.value)}
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 m-0 border-none cursor-pointer"
+                />
+            </div>
+            </div>
 
-        {/* Settings Panel */}
-        <CollapsiblePanel 
-            title="Properties" 
-            icon={<Sliders size={14} />} 
-            isOpen={settingsOpen} 
-            setIsOpen={setSettingsOpen}
-        >
-             {/* Color Row */}
-             <div className="flex items-center justify-between mb-2 p-1">
-                <div className="text-stone-400 text-xs flex items-center gap-1">
-                    <Palette size={14} /> Color
-                </div>
-                <div className="relative w-6 h-6 rounded-full overflow-hidden border border-stone-600 hover:border-amber-500 transition-colors">
-                    <input 
-                        type="color" 
-                        value={sandColor}
-                        onChange={(e) => setSandColor(e.target.value)}
-                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 m-0 border-none cursor-pointer"
-                    />
-                </div>
-             </div>
+            <div className="h-[1px] bg-stone-700 mb-2"></div>
 
-             <div className="h-[1px] bg-stone-700 mb-2"></div>
+            {/* Dynamic Slider: Size */}
+            <div className="flex items-center gap-2 mb-2 p-1">
+            <div 
+                className={`text-stone-400 transition-colors cursor-help ${selectedItemData ? 'text-amber-500' : ''}`} 
+                title={selectedItemData ? "Selected Item Size" : "New Item Size"}
+            >
+                <AlignCenterVertical size={16} />
+            </div>
+            <input 
+                type="range" min="0.2" max="4.0" step="0.1"
+                value={selectedItemData ? selectedItemData.scale : placementScale}
+                onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (selectedItemData) {
+                        updateSelected({ scale: val });
+                    } else {
+                        setPlacementScale(val);
+                    }
+                }}
+                className={`flex-1 min-w-0 h-1 rounded-lg appearance-none cursor-pointer ${selectedItemData ? 'bg-amber-900/50 accent-amber-500' : 'bg-stone-700 accent-stone-500'}`}
+            />
+            </div>
 
-             {/* Dynamic Slider: Size */}
-             <div className="flex items-center gap-2 mb-2 p-1">
-                <div 
-                    className={`text-stone-400 transition-colors cursor-help ${selectedItemData ? 'text-amber-500' : ''}`} 
-                    title={selectedItemData ? "Selected Item Size" : "New Item Size"}
-                >
-                    <AlignCenterVertical size={16} />
+            {/* Rotation (Contextual) */}
+            {selectedItemData && (
+                <div className="flex items-center gap-2 mb-2 p-1">
+                <div className="text-amber-500 cursor-help" title="Rotation">
+                    <RotateCw size={16} />
                 </div>
                 <input 
-                    type="range" min="0.2" max="4.0" step="0.1"
-                    value={selectedItemData ? selectedItemData.scale : placementScale}
-                    onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        if (selectedItemData) {
-                            updateSelected({ scale: val });
-                        } else {
-                            setPlacementScale(val);
-                        }
-                    }}
-                    className={`flex-1 min-w-0 h-1 rounded-lg appearance-none cursor-pointer ${selectedItemData ? 'bg-amber-900/50 accent-amber-500' : 'bg-stone-700 accent-stone-500'}`}
+                    type="range" min="0" max={Math.PI * 2} step="0.1"
+                    value={selectedItemData.rotation}
+                    onChange={(e) => updateSelected({ rotation: parseFloat(e.target.value) })}
+                    className="flex-1 min-w-0 h-1 bg-amber-900/50 rounded-lg appearance-none cursor-pointer accent-amber-500"
                 />
-             </div>
-
-             {/* Rotation (Contextual) */}
-             {selectedItemData && (
-                 <div className="flex items-center gap-2 mb-2 p-1">
-                    <div className="text-amber-500 cursor-help" title="Rotation">
-                        <RotateCw size={16} />
-                    </div>
-                    <input 
-                        type="range" min="0" max={Math.PI * 2} step="0.1"
-                        value={selectedItemData.rotation}
-                        onChange={(e) => updateSelected({ rotation: parseFloat(e.target.value) })}
-                        className="flex-1 min-w-0 h-1 bg-amber-900/50 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                    />
-                 </div>
-             )}
-
-             {/* Rake Depth (Contextual) */}
-             {!selectedItemData && (currentTool === 'RAKE' || currentTool === 'SMOOTH') && (
-                 <div className="flex items-center gap-2 mb-2 p-1">
-                    <div className="text-stone-400 cursor-help" title="Rake Depth">
-                        <Settings size={16} />
-                    </div>
-                    <input 
-                        type="range" min="0.1" max="3.0" step="0.1"
-                        value={rakeDepth}
-                        onChange={(e) => setRakeDepth(parseFloat(e.target.value))}
-                        className="flex-1 min-w-0 h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-stone-500"
-                    />
-                 </div>
-             )}
-        </CollapsiblePanel>
-
-        {/* Audio Mixer */}
-        <CollapsiblePanel 
-            title="Sounds" 
-            icon={<Music size={14} />} 
-            isOpen={audioOpen} 
-            setIsOpen={setAudioOpen}
-        >
-            {!isAudioInitialized ? (
-                 <button 
-                    onClick={initAudio}
-                    className="w-full py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded text-xs transition-colors font-medium"
-                 >
-                    Initialize Audio Engine
-                 </button>
-            ) : (
-                <div className="space-y-3 pt-1">
-                    {[
-                        { key: 'wind', icon: <Wind size={12}/>, label: 'Wind' },
-                        { key: 'rain', icon: <CloudRain size={12}/>, label: 'Rain' },
-                        { key: 'bowls', icon: <Radio size={12}/>, label: 'Bowls' },
-                    ].map((item) => (
-                        <div key={item.key} className="space-y-1">
-                            <div className="flex justify-between text-[10px] text-stone-400 font-medium">
-                                <span className="flex items-center gap-1">{item.icon} {item.label}</span>
-                            </div>
-                            <input 
-                                type="range" min="0" max="1" step="0.01"
-                                value={(audioState as any)[item.key]}
-                                onChange={(e) => handleVolumeChange(item.key as keyof SoundState, parseFloat(e.target.value))}
-                                className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-amber-600 block"
-                            />
-                        </div>
-                    ))}
                 </div>
             )}
-        </CollapsiblePanel>
 
-      </div>
+            {/* Rake Depth (Contextual) */}
+            {!selectedItemData && (currentTool === 'RAKE' || currentTool === 'SMOOTH') && (
+                <div className="flex items-center gap-2 mb-2 p-1">
+                <div className="text-stone-400 cursor-help" title="Rake Depth">
+                    <Settings size={16} />
+                </div>
+                <input 
+                    type="range" min="0.1" max="3.0" step="0.1"
+                    value={rakeDepth}
+                    onChange={(e) => setRakeDepth(parseFloat(e.target.value))}
+                    className="flex-1 min-w-0 h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-stone-500"
+                />
+                </div>
+            )}
+      </DraggablePanel>
+
+      {/* Audio Mixer */}
+      <DraggablePanel 
+          title="Sounds" 
+          icon={<Music size={14} />} 
+          isOpen={audioOpen} 
+          setIsOpen={setAudioOpen}
+          position={audioPos}
+          onMove={setAudioPos}
+      >
+          {!isAudioInitialized ? (
+                <button 
+                onClick={initAudio}
+                className="w-full py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded text-xs transition-colors font-medium"
+                >
+                Initialize Audio Engine
+                </button>
+          ) : (
+            <div className="space-y-3 pt-1">
+                {[
+                    { key: 'wind', icon: <Wind size={12}/>, label: 'Wind' },
+                    { key: 'rain', icon: <CloudRain size={12}/>, label: 'Rain' },
+                    { key: 'bowls', icon: <Radio size={12}/>, label: 'Bowls' },
+                ].map((item) => (
+                    <div key={item.key} className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-stone-400 font-medium">
+                            <span className="flex items-center gap-1">{item.icon} {item.label}</span>
+                        </div>
+                        <input 
+                            type="range" min="0" max="1" step="0.01"
+                            value={(audioState as any)[item.key]}
+                            onChange={(e) => handleVolumeChange(item.key as keyof SoundState, parseFloat(e.target.value))}
+                            className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-amber-600 block"
+                        />
+                    </div>
+                ))}
+            </div>
+          )}
+      </DraggablePanel>
     </div>
   );
 };
