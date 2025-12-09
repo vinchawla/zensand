@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ToolType, SoundState, GenericItemData } from '../types';
-import { Eraser, Circle, Trash2, Wind, CloudRain, Music, Radio, Palette, Settings, TreePine, Flower2, Waves, Landmark, AlignCenterVertical, MousePointer2, RotateCw, Download } from 'lucide-react';
+import { Eraser, Circle, Trash2, Wind, CloudRain, Music, Radio, Palette, Settings, TreePine, Flower2, Waves, Landmark, AlignCenterVertical, MousePointer2, RotateCw, Download, ChevronUp, ChevronDown, Hammer, Sliders } from 'lucide-react';
 import { audioEngine } from '../services/audioService';
 
 interface ControlsProps {
@@ -46,6 +46,40 @@ const BridgeIcon = ({ size = 20 }: { size?: number }) => (
      </svg>
 );
 
+const CollapsiblePanel = ({ 
+    title, 
+    icon, 
+    isOpen, 
+    setIsOpen, 
+    children 
+}: { 
+    title: string;
+    icon: React.ReactNode;
+    isOpen: boolean;
+    setIsOpen: (v: boolean) => void;
+    children?: React.ReactNode;
+}) => (
+    <div className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-stone-700 shadow-xl w-56 shrink-0 transition-all duration-300 overflow-hidden pointer-events-auto">
+        <button 
+            onClick={() => setIsOpen(!isOpen)}
+            className={`w-full p-3 flex items-center justify-between text-stone-300 hover:bg-stone-800/50 transition-colors ${isOpen ? 'border-b border-stone-700/50' : ''}`}
+        >
+            <div className="flex items-center gap-2">
+                {icon}
+                <span className="font-semibold uppercase tracking-widest text-[10px]">{title}</span>
+            </div>
+            {isOpen ? <ChevronUp size={14} className="text-stone-500" /> : <ChevronDown size={14} className="text-stone-500" />}
+        </button>
+        <div 
+            className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+        >
+            <div className="p-2 pt-2">
+                {children}
+            </div>
+        </div>
+    </div>
+);
+
 const Controls: React.FC<ControlsProps> = ({ 
     currentTool, 
     setTool, 
@@ -63,6 +97,9 @@ const Controls: React.FC<ControlsProps> = ({
     updateSelected,
     onDownload
 }) => {
+  const [toolsOpen, setToolsOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [audioOpen, setAudioOpen] = useState(true);
 
   const handleVolumeChange = (channel: keyof SoundState, val: number) => {
     if (!isAudioInitialized) initAudio();
@@ -99,32 +136,41 @@ const Controls: React.FC<ControlsProps> = ({
         </button>
       </div>
 
-      {/* Main Controls Section (Scrollable if needed) */}
-      <div className="flex flex-col gap-2 pointer-events-auto flex-1 overflow-y-auto scrollbar-hide min-h-0">
+      {/* Main Controls Stack */}
+      <div className="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-hide min-h-0 pb-4">
         
-        {/* Tools Grid - Compact */}
-        <div className="bg-stone-900/80 backdrop-blur-md p-2 rounded-xl border border-stone-700 shadow-xl w-56 shrink-0">
-          <div className="grid grid-cols-2 gap-1">
-              {tools.map((t) => (
-                  <button
-                      key={t.id}
-                      onClick={() => setTool(t.id as ToolType)}
-                      className={`p-2 rounded-lg transition-all duration-200 flex flex-col items-center justify-center gap-1 group relative
-                          ${currentTool === t.id 
-                              ? 'bg-amber-700 text-white shadow-md' 
-                              : 'bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-200'}`}
-                      title={t.label}
-                  >
-                      {t.icon}
-                      <span className="text-[9px] font-medium leading-none">{t.label}</span>
-                  </button>
-              ))}
-          </div>
-        </div>
+        {/* Tools Panel */}
+        <CollapsiblePanel 
+            title="Tools" 
+            icon={<Hammer size={14} />} 
+            isOpen={toolsOpen} 
+            setIsOpen={setToolsOpen}
+        >
+            <div className="grid grid-cols-2 gap-1">
+                {tools.map((t) => (
+                    <button
+                        key={t.id}
+                        onClick={() => setTool(t.id as ToolType)}
+                        className={`p-2 rounded-lg transition-all duration-200 flex flex-col items-center justify-center gap-1 group relative
+                            ${currentTool === t.id 
+                                ? 'bg-amber-700 text-white shadow-md' 
+                                : 'bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-200'}`}
+                        title={t.label}
+                    >
+                        {t.icon}
+                        <span className="text-[9px] font-medium leading-none">{t.label}</span>
+                    </button>
+                ))}
+            </div>
+        </CollapsiblePanel>
 
-        {/* Settings Panel - Compact */}
-        <div className="bg-stone-900/80 backdrop-blur-md p-2 rounded-xl border border-stone-700 shadow-xl w-56 shrink-0">
-             
+        {/* Settings Panel */}
+        <CollapsiblePanel 
+            title="Properties" 
+            icon={<Sliders size={14} />} 
+            isOpen={settingsOpen} 
+            setIsOpen={setSettingsOpen}
+        >
              {/* Color Row */}
              <div className="flex items-center justify-between mb-2 p-1">
                 <div className="text-stone-400 text-xs flex items-center gap-1">
@@ -194,46 +240,46 @@ const Controls: React.FC<ControlsProps> = ({
                     />
                  </div>
              )}
-        </div>
-      </div>
+        </CollapsiblePanel>
 
-      {/* Audio Mixer - Compact Bottom */}
-      <div className="bg-stone-900/80 backdrop-blur-md p-3 rounded-xl border border-stone-700 pointer-events-auto shadow-xl w-56 mt-2 shrink-0">
-        <div className="flex items-center gap-2 mb-2 text-stone-300 border-b border-stone-700 pb-1">
-            <Music size={14} />
-            <span className="font-semibold uppercase tracking-widest text-[10px]">Sounds</span>
-        </div>
-        
-        {!isAudioInitialized ? (
-             <button 
-                onClick={initAudio}
-                className="w-full py-1 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded text-xs transition-colors"
-             >
-                Start Audio
-             </button>
-        ) : (
-            <div className="space-y-2">
-                {[
-                    { key: 'wind', icon: <Wind size={10}/>, label: 'Wind' },
-                    { key: 'rain', icon: <CloudRain size={10}/>, label: 'Rain' },
-                    { key: 'bowls', icon: <Radio size={10}/>, label: 'Bowls' },
-                ].map((item) => (
-                    <div key={item.key} className="space-y-0.5">
-                        <div className="flex justify-between text-[10px] text-stone-400">
-                            <span className="flex items-center gap-1">{item.icon} {item.label}</span>
+        {/* Audio Mixer */}
+        <CollapsiblePanel 
+            title="Sounds" 
+            icon={<Music size={14} />} 
+            isOpen={audioOpen} 
+            setIsOpen={setAudioOpen}
+        >
+            {!isAudioInitialized ? (
+                 <button 
+                    onClick={initAudio}
+                    className="w-full py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded text-xs transition-colors font-medium"
+                 >
+                    Initialize Audio Engine
+                 </button>
+            ) : (
+                <div className="space-y-3 pt-1">
+                    {[
+                        { key: 'wind', icon: <Wind size={12}/>, label: 'Wind' },
+                        { key: 'rain', icon: <CloudRain size={12}/>, label: 'Rain' },
+                        { key: 'bowls', icon: <Radio size={12}/>, label: 'Bowls' },
+                    ].map((item) => (
+                        <div key={item.key} className="space-y-1">
+                            <div className="flex justify-between text-[10px] text-stone-400 font-medium">
+                                <span className="flex items-center gap-1">{item.icon} {item.label}</span>
+                            </div>
+                            <input 
+                                type="range" min="0" max="1" step="0.01"
+                                value={(audioState as any)[item.key]}
+                                onChange={(e) => handleVolumeChange(item.key as keyof SoundState, parseFloat(e.target.value))}
+                                className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-amber-600 block"
+                            />
                         </div>
-                        <input 
-                            type="range" min="0" max="1" step="0.01"
-                            value={(audioState as any)[item.key]}
-                            onChange={(e) => handleVolumeChange(item.key as keyof SoundState, parseFloat(e.target.value))}
-                            className="w-full h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-amber-600"
-                        />
-                    </div>
-                ))}
-            </div>
-        )}
-      </div>
+                    ))}
+                </div>
+            )}
+        </CollapsiblePanel>
 
+      </div>
     </div>
   );
 };
