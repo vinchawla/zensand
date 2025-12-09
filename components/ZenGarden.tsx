@@ -354,10 +354,9 @@ interface SandPlaneProps {
     sandColor: string;
     setControlsEnabled: (enabled: boolean) => void;
     rakeDepth: number;
-    onStartDrag: (e: any) => void;
 }
 
-const SandPlane = ({ tool, onAddItem, sandColor, setControlsEnabled, rakeDepth, onStartDrag }: SandPlaneProps) => {
+const SandPlane = ({ tool, onAddItem, sandColor, setControlsEnabled, rakeDepth }: SandPlaneProps) => {
   const { gl } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
   const isDrawing = useRef(false);
@@ -468,7 +467,8 @@ const SandPlane = ({ tool, onAddItem, sandColor, setControlsEnabled, rakeDepth, 
            interpolateAndDraw(e.uv, tool === 'SMOOTH');
       } else if (tool === 'SELECT') {
            e.stopPropagation();
-           onStartDrag(e);
+           // Clicking on empty sand in SELECT mode deselects
+           onAddItem(tool, e.point);
       }
   };
 
@@ -711,7 +711,6 @@ const SceneContent: React.FC<ZenGardenProps> = ({
                 sandColor={sandColor} 
                 setControlsEnabled={setControlsEnabled}
                 rakeDepth={rakeDepth}
-                onStartDrag={handleStartDrag}
             />
             
             {rocks.map(item => <Rock key={item.id} data={item} isSelected={selection?.id === item.id} onClick={() => handleItemClick(item.id, 'rock')} onPointerDown={(e) => handleItemPointerDown(item.id, 'rock', e)} />)}

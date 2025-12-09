@@ -115,6 +115,11 @@ const App: React.FC = () => {
   };
 
   const handleToolChange = (tool: ToolType) => {
+      // If clicking select while already in select mode, clear selection
+      if (tool === 'SELECT' && currentTool === 'SELECT') {
+          setSelection(null);
+      }
+      
       setTool(tool);
       if (tool !== 'SELECT') {
           setSelection(null);
